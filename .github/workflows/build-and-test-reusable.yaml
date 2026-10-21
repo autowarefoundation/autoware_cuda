@@ -1,0 +1,86 @@
+name: Reusable Build and Test Workflow
+
+on:
+  workflow_call:
+    secrets:
+      codecov-token:
+        required: false
+    inputs:
+      rosdistro:
+        type: string
+        required: true
+      container:
+        type: string
+        required: true
+      upload-coverage:
+        type: boolean
+        default: false
+        required: false
+      codecov-flag:
+        type: string
+        default: other
+        required: false
+
+jobs:
+  build-and-test:
+    name: build-and-test-${{ inputs.rosdistro }}
+    # The CUDA images do not fit on the disk of the GitHub-hosted runners.
+    runs-on: [self-hosted, Linux, X64]
+    container: ${{ inputs.container }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Show disk space before the tasks
+        run: df -h
+
+      - name: Remove exec_depend
+        uses: autowarefoundation/autoware-github-actions/remove-exec-depend@v1
+
+      - name: Get self packages
+        id: get-self-packages
+        uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
+
+      # After the autoware-core-*-cuda images exist, /opt/autoware holds released copies of these packages.
+      - name: Remove self packages from underlay
+        run: |
+          for pkg_xml in $(find . -name package.xml); do
+            pkg_name=$(xmllint --xpath 'string(//package/name)' "$pkg_xml")
+            if [ -d "/opt/autoware/$pkg_name" ]; then
+              echo "Removing /opt/autoware/$pkg_name"
+              rm -rf "/opt/autoware/$pkg_name"
+            fi
+          done
+        shell: bash
+
+      - name: Build
+        if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
+        uses: autowarefoundation/autoware-github-actions/colcon-build@v1
+        with:
+          rosdistro: ${{ inputs.rosdistro }}
+          target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+          underlay-workspace: /opt/autoware
+
+      - name: Test
+        if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
+        id: test
+        uses: autowarefoundation/autoware-github-actions/colcon-test@v1
+        with:
+          rosdistro: ${{ inputs.rosdistro }}
+          target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+          underlay-workspace: /opt/autoware
+
+      - name: Upload coverage to CodeCov
+        if: ${{ inputs.upload-coverage && steps.test.outputs.coverage-report-files != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: ${{ steps.test.outputs.coverage-report-files }}
+          disable_search: true
+          plugins: noop
+          fail_ci_if_error: false
+          verbose: true
+          flags: ${{ inputs.codecov-flag }}
+          token: ${{ secrets.codecov-token }}
+
+      - name: Show disk space after the tasks
+        run: df -h
