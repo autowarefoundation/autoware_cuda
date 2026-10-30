@@ -12,6 +12,11 @@ on:
       container:
         type: string
         required: true
+      above:
+        description: True if the packages of packages_above.repos that depend on this repository should be built and tested too.
+        type: boolean
+        default: false
+        required: false
       upload-coverage:
         type: boolean
         default: false
@@ -23,13 +28,16 @@ on:
 
 jobs:
   build-and-test:
-    name: build-and-test-${{ inputs.rosdistro }}
+    name: build-and-test-${{ inputs.rosdistro }}${{ inputs.above && '-above' || '' }}
     # The CUDA images do not fit on the disk of the GitHub-hosted runners.
     runs-on: [self-hosted, Linux, X64]
     container: ${{ inputs.container }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          # get-modified-packages needs the merge base with the base branch.
+          fetch-depth: 0
 
       - name: Show disk space before the tasks
         run: df -h
@@ -41,6 +49,23 @@ jobs:
         id: get-self-packages
         uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
 
+      - name: Get modified packages
+        id: get-modified-packages
+        if: ${{ inputs.above && github.event_name == 'pull_request' }}
+        uses: autowarefoundation/autoware-github-actions/get-modified-packages@v1
+
+      # On a PR, the above job checks only the packages above the modified packages.
+      - name: Get target packages
+        id: get-target-packages
+        run: |
+          if [ "${{ inputs.above && github.event_name == 'pull_request' }}" = "true" ]; then
+            target_packages="${{ steps.get-modified-packages.outputs.modified-packages }}"
+          else
+            target_packages="${{ steps.get-self-packages.outputs.self-packages }}"
+          fi
+          echo "target-packages=$target_packages" >> "$GITHUB_OUTPUT"
+        shell: bash
+
       # After the autoware-core-*-cuda images exist, /opt/autoware holds released copies of these packages.
       - name: Remove self packages from underlay
         run: |
@@ -48,26 +73,64 @@ jobs:
             pkg_name=$(xmllint --xpath 'string(//package/name)' "$pkg_xml")
             if [ -d "/opt/autoware/$pkg_name" ]; then
               echo "Removing /opt/autoware/$pkg_name"
-              rm -rf "/opt/autoware/$pkg_name"
+              sudo rm -rf "/opt/autoware/$pkg_name"
+            fi
+          done
+        shell: bash
+
+      - name: Import packages above
+        if: ${{ inputs.above && steps.get-target-packages.outputs.target-packages != '' }}
+        run: |
+          mkdir -p dependency_ws
+          vcs import --recursive dependency_ws < packages_above.repos
+
+          universe=dependency_ws/universe/autoware_universe
+          python3 "$universe/.github/actions/combine-repos-action/combine-repos.py" \
+            --base "$universe/build_depends_stable.repos" \
+            --overlay "$universe/build_depends_nightly.repos" \
+            --output build_depends.repos
+          vcs import --recursive dependency_ws < build_depends.repos
+
+          # TODO: Remove this loop after autoware_universe no longer has the packages of this repository.
+          # Until then, colcon would find each of them twice.
+          for self_pkg in ${{ steps.get-self-packages.outputs.self-packages }}; do
+            for pkg_xml in $(find dependency_ws -name package.xml); do
+              if [ "$(xmllint --xpath 'string(//package/name)' "$pkg_xml")" = "$self_pkg" ]; then
+                echo "Removing the copy of $self_pkg at $(dirname "$pkg_xml")"
+                rm -rf "$(dirname "$pkg_xml")"
+              fi
+            done
+          done
+
+          # The released Debian package installs the same headers under /opt/ros/$ROS_DISTRO/include,
+          # which is searched before the workspace include directory. Leaving it in place lets
+          # a stale released header shadow the one built from source.
+          for pkg_xml in $(find dependency_ws -name package.xml); do
+            pkg_name=$(xmllint --xpath 'string(//package/name)' "$pkg_xml")
+            deb_name="ros-${{ inputs.rosdistro }}-${pkg_name//_/-}"
+            if dpkg-query -W -f='${Status}' "$deb_name" 2>/dev/null | grep -q '^install ok installed$'; then
+              echo "Removing $deb_name"
+              sudo dpkg --remove --force-depends "$deb_name"
             fi
           done
         shell: bash
 
       - name: Build
-        if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
+        if: ${{ steps.get-target-packages.outputs.target-packages != '' }}
         uses: autowarefoundation/autoware-github-actions/colcon-build@v1
         with:
           rosdistro: ${{ inputs.rosdistro }}
-          target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+          target-packages: ${{ steps.get-target-packages.outputs.target-packages }}
+          cache-key-element: build-and-test${{ inputs.above && '-above' || '' }}
           underlay-workspace: /opt/autoware
 
       - name: Test
-        if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
+        if: ${{ steps.get-target-packages.outputs.target-packages != '' }}
         id: test
         uses: autowarefoundation/autoware-github-actions/colcon-test@v1
         with:
           rosdistro: ${{ inputs.rosdistro }}
-          target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+          target-packages: ${{ steps.get-target-packages.outputs.target-packages }}
           underlay-workspace: /opt/autoware
 
       - name: Upload coverage to CodeCov
