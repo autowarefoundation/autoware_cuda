@@ -16,11 +16,13 @@ jobs:
       fail-fast: false
       matrix:
         rosdistro: [humble, jazzy]
+        above: [false, true]
     uses: ./.github/workflows/build-and-test-reusable.yaml
     with:
       rosdistro: ${{ matrix.rosdistro }}
       container: ghcr.io/autowarefoundation/autoware:universe-dependencies-cuda-${{ matrix.rosdistro }}
-      upload-coverage: ${{ matrix.rosdistro == 'jazzy' }}
+      above: ${{ matrix.above }}
+      upload-coverage: ${{ matrix.rosdistro == 'jazzy' && !matrix.above }}
       codecov-flag: total
     secrets:
       codecov-token: ${{ secrets.CODECOV_TOKEN }}
