@@ -2,6 +2,11 @@
 Changelog for package autoware_tensorrt_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.0 (2026-10-30)
+------------------
+* First release from the standalone repository. The package moved out of ``autoware_universe`` into ``autoware_cuda`` (`autoware#7340 <https://github.com/autowarefoundation/autoware/issues/7340>`_).
+* Contributors: Mete Fatih Cırıt
+
 0.53.0 (2026-09-29)
 -------------------
 * Merge remote-tracking branch 'origin/main' into prepare-0.53.0-changelog
