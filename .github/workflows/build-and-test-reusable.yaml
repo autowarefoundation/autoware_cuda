@@ -74,8 +74,9 @@ jobs:
           echo "target-packages=$target_packages" >> "$GITHUB_OUTPUT"
         shell: bash
 
-      # After the autoware-core-*-cuda images exist, /opt/autoware holds released copies of these packages.
+      # core-dependencies-cuda does not hold these packages. The universe image can hold released copies.
       - name: Remove self packages from underlay
+        if: ${{ inputs.above }}
         run: |
           for pkg_xml in $(find . -name package.xml); do
             pkg_name=$(xmllint --xpath 'string(//package/name)' "$pkg_xml")
