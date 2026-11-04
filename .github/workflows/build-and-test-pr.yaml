@@ -29,5 +29,5 @@ jobs:
     uses: ./.github/workflows/build-and-test-reusable.yaml
     with:
       rosdistro: ${{ matrix.rosdistro }}
-      container: ghcr.io/autowarefoundation/autoware:universe-dependencies-cuda-${{ matrix.rosdistro }}
+      container: ghcr.io/autowarefoundation/autoware:${{ matrix.above && 'universe' || 'core' }}-dependencies-cuda-${{ matrix.rosdistro }}
       above: ${{ matrix.above }}
