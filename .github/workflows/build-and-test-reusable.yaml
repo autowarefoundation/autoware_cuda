@@ -99,9 +99,9 @@ jobs:
           vcs import --recursive dependency_ws < "$universe/build_depends_nightly.repos"
           vcs import --recursive --skip-existing dependency_ws < "$universe/build_depends_stable.repos"
 
-          # TODO: Remove this loop after neither autoware_universe nor its build_depends_*.repos
-          # contain the packages of this repository, that is, after the CI images contain autoware_cuda.
-          # Until then, colcon would find each of them twice.
+          # build_depends_stable.repos of autoware_universe keeps core/cuda/autoware_cuda for its CPU jobs,
+          # so the import brings a second copy of each package of this repository.
+          # Without this loop, colcon finds each of them twice and stops with an error.
           self_packages=" ${{ steps.get-self-packages.outputs.self-packages }} "
           for pkg_xml in $(find dependency_ws -name package.xml); do
             pkg_name=$(xmllint --xpath 'string(//package/name)' "$pkg_xml")
