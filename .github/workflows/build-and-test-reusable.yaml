@@ -74,7 +74,7 @@ jobs:
           echo "target-packages=$target_packages" >> "$GITHUB_OUTPUT"
         shell: bash
 
-      # core-dependencies-cuda does not hold these packages. The universe image can hold released copies.
+      # universe-dependencies-cuda holds released copies of these packages.
       - name: Remove self packages from underlay
         if: ${{ inputs.above }}
         run: |
@@ -99,9 +99,9 @@ jobs:
           vcs import --recursive dependency_ws < "$universe/build_depends_nightly.repos"
           vcs import --recursive --skip-existing dependency_ws < "$universe/build_depends_stable.repos"
 
-          # build_depends_stable.repos of autoware_universe keeps core/cuda/autoware_cuda for its CPU jobs,
-          # so the import brings a second copy of each package of this repository.
-          # Without this loop, colcon finds each of them twice and stops with an error.
+          # build_depends_stable.repos of autoware_universe still lists core/cuda/autoware_cuda.
+          # colcon fails when it finds a package twice, so ignore those copies.
+          # Remove this loop when that entry goes.
           self_packages=" ${{ steps.get-self-packages.outputs.self-packages }} "
           for pkg_xml in $(find dependency_ws -name package.xml); do
             pkg_name=$(xmllint --xpath 'string(//package/name)' "$pkg_xml")
