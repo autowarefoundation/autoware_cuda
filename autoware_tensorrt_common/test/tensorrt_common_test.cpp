@@ -149,6 +149,17 @@ TEST_F(TrtCommonIOTest, ModelDeclaringEveryOfferedTensorIsAccepted)
   EXPECT_TRUE(setup(*trt, declaredProfileDims(), declaredNetworkIO()));
 }
 
+TEST_F(TrtCommonIOTest, BuildingAnEngineLeavesTheConfiguredEnginePathUntouched)
+{
+  auto trt = makeTrt("engine_path");
+  ASSERT_TRUE(setup(*trt, declaredProfileDims(), declaredNetworkIO()));
+
+  EXPECT_EQ(trt->getTrtCommonConfig()->engine_path, enginePath("engine_path"));
+  EXPECT_TRUE(std::filesystem::exists(enginePath("engine_path")));
+  EXPECT_TRUE(std::filesystem::exists(work_dir_ / "engine_path.json"))
+    << "the layer information is written next to the engine";
+}
+
 TEST_F(TrtCommonIOTest, UndeclaredOptionalTensorIsDropped)
 {
   auto profile = declaredProfileDims();
