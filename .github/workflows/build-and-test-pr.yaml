@@ -31,3 +31,6 @@ jobs:
       rosdistro: ${{ matrix.rosdistro }}
       container: ghcr.io/autowarefoundation/autoware:${{ matrix.above && 'universe' || 'core' }}-dependencies-cuda-${{ matrix.rosdistro }}
       above: ${{ matrix.above }}
+      upload-coverage: ${{ matrix.rosdistro == 'jazzy' && !matrix.above }}
+    secrets:
+      codecov-token: ${{ secrets.CODECOV_TOKEN }}

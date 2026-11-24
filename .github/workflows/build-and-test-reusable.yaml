@@ -22,8 +22,9 @@ on:
         default: false
         required: false
       codecov-flag:
+        description: Leave it empty on PRs. A PR upload with the full-suite flag replaces the carried-forward full-suite data.
         type: string
-        default: other
+        default: ""
         required: false
 
 jobs:
