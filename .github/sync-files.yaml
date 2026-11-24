@@ -24,4 +24,5 @@
     - source: CPPLINT.cfg
     - source: DISCLAIMER.md
     - source: LICENSE
+    - source: codecov.yaml
     - source: setup.cfg
