@@ -266,3 +266,21 @@ TEST_F(TrtCommonIOTest, AnOfferOfNothingButAbsentOptionalTensorsIsStillAnAccount
   EXPECT_FALSE(std::filesystem::exists(enginePath("all_optional_absent")))
     << "a model the caller cannot fully bind should be refused before an engine is built for it";
 }
+
+TEST_F(TrtCommonIOTest, ResolvedShapeFollowsTheInputShapes)
+{
+  auto trt = makeTrt("resolved_shape");
+  ASSERT_TRUE(setup(*trt, declaredProfileDims(), declaredNetworkIO()));
+
+  for (const auto & shape : {kMin, kOpt, kMax}) {
+    for (const auto * input : {"required_a", "required_b", "optional_present"}) {
+      ASSERT_TRUE(trt->setInputShape(input, shape));
+    }
+    const auto resolved = trt->getResolvedTensorShape("sum");
+    ASSERT_EQ(resolved.nbDims, 2);
+    EXPECT_EQ(resolved.d[0], shape.d[0]);
+    EXPECT_EQ(resolved.d[1], kWidth);
+  }
+  // The engine keeps the dynamic dimension.
+  EXPECT_EQ(trt->getTensorShape("sum").d[0], -1);
+}

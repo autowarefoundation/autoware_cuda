@@ -152,6 +152,17 @@ public:
   [[nodiscard]] nvinfer1::Dims getTensorShape(const char * tensor_name) const;
 
   /**
+   * @brief Get tensor shape by name as resolved by the TensorRT context.
+   *
+   * Unlike `getTensorShape`, dynamic dimensions take the values that follow from the input shapes
+   * set so far. Dimensions that depend on the input data stay -1.
+   *
+   * @param[in] tensor_name Tensor name.
+   * @return Tensor shape.
+   */
+  [[nodiscard]] nvinfer1::Dims getResolvedTensorShape(const char * tensor_name) const;
+
+  /**
    * @brief Get output tensor data type by name from TensorRT engine.
    *
    * @param[in] tensor_name Tensor name.

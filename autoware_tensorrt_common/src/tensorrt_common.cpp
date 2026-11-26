@@ -455,6 +455,15 @@ nvinfer1::Dims TrtCommon::getTensorShape(const char * tensor_name) const
   return engine_->getTensorShape(tensor_name);
 }
 
+nvinfer1::Dims TrtCommon::getResolvedTensorShape(const char * tensor_name) const
+{
+  if (!context_) {
+    logger_->log(nvinfer1::ILogger::Severity::kERROR, "Context is not initialized");
+    return nvinfer1::Dims{};
+  }
+  return context_->getTensorShape(tensor_name);
+}
+
 nvinfer1::TensorIOMode TrtCommon::getTensorIOMode(const char * tensor_name) const
 {
   if (!engine_) {
